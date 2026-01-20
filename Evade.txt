@@ -1,0 +1,321 @@
+local WindUI = loadstring(
+    game:HttpGet("https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua")
+)()
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local LocalPlayer = Players.LocalPlayer
+
+local Window = WindUI:CreateWindow({
+    Title = "Shnmaxhub Evade - Admin Panel",
+    Icon = "geist:window",
+    Author = "By Shelby",
+    Size = UDim2.fromOffset(580, 490),
+    Theme = "Midnight",
+    HideSearchBar = false,
+    SideBarWidth = 200,
+
+    User = {
+        Enabled = true,
+        Anonymous = false,
+        Callback = function()
+            WindUI:Notify({
+                Title = "User Profile",
+                Content = "User profile clicked!",
+                Duration = 3
+            })
+        end
+    }
+})
+
+local HomeTab = Window
+    :Section({ Title = "Home", Opened = true })
+    :Tab({ Title = "Welcome", Icon = "house" })
+
+HomeTab:Section({
+    Title = "Important Notices",
+    TextSize = 18
+})
+
+HomeTab:Button({
+    Title = "Read Disclaimer",
+    Callback = function()
+        Window:Dialog({
+            Title = "Disclaimer",
+            Content =
+                "This Admin Panel is for educational purposes only.\n\n" ..
+                "Use responsibly. Some features may cause bans or instability.",
+            Buttons = {
+                { Title = "OK", Variant = "Primary" }
+            }
+        })
+    end
+})
+
+local TeleportTab = Window
+    :Section({ Title = "Teleport", Opened = false })
+    :Tab({ Title = "Teleport System", Icon = "map-pin" })
+
+local function GetOtherPlayers()
+    local list = {}
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(list, player.Name)
+        end
+    end
+    return list
+end
+
+local PlayerDropdown = TeleportTab:Dropdown({
+    Title = "Select Player",
+    Values = GetOtherPlayers(),
+    Value = "",
+    Callback = function(playerName)
+        local target = Players:FindFirstChild(playerName)
+        if target
+            and target.Character
+            and target.Character:FindFirstChild("HumanoidRootPart")
+            and LocalPlayer.Character
+            and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+
+            LocalPlayer.Character:MoveTo(
+                target.Character.HumanoidRootPart.Position
+            )
+        end
+    end
+})
+
+TeleportTab:Button({
+    Title = "Refresh Player List",
+    Callback = function()
+        PlayerDropdown:SetValues(GetOtherPlayers())
+    end
+})
+
+local ToolsTab = Window
+    :Section({ Title = "Admin Tools", Opened = false })
+    :Tab({ Title = "Tools", Icon = "user" })
+
+-- TpWalk
+local TpWalkEnabled = false
+local TpWalkSpeed = 20
+
+ToolsTab:Section({
+    Title = "Tpwalk Speed Config",
+    Icon = "edit-3"
+}):Input({
+    Title = "Speed Value",
+    Placeholder = "Default 20",
+    Value = tostring(TpWalkSpeed),
+    Callback = function(text)
+        local value = tonumber(text)
+        if value and value > 0 then
+            TpWalkSpeed = value
+            WindUI:Notify({
+                Title = "Tpwalk Speed",
+                Content = "Speed set to " .. TpWalkSpeed,
+                Duration = 2
+            })
+        else
+            TpWalkSpeed = 20
+            WindUI:Notify({
+                Title = "Invalid Input",
+                Content = "Reset to default (20)",
+                Duration = 2
+            })
+        end
+    end
+})
+
+ToolsTab:Toggle({
+    Title = "Tpwalk",
+    Value = false,
+    Callback = function(state)
+        TpWalkEnabled = state
+
+        WindUI:Notify({
+            Title = "Tpwalk",
+            Content = state and "Tpwalk Enabled" or "Tpwalk Disabled",
+            Duration = 2
+        })
+
+        if state then
+            task.spawn(function()
+                while TpWalkEnabled do
+                    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+                    local humanoid = char:FindFirstChildWhichIsA("Humanoid")
+
+                    if humanoid then
+                        local delta = RunService.Heartbeat:Wait()
+                        if humanoid.MoveDirection.Magnitude > 0 then
+                            char:TranslateBy(
+                                humanoid.MoveDirection * TpWalkSpeed * delta
+                            )
+                        end
+                    else
+                        RunService.Heartbeat:Wait()
+                    end
+                end
+            end)
+        end
+    end
+})
+
+local AutoReviveEnabled = false
+
+ToolsTab:Toggle({
+    Title = "Auto-Revive",
+    Value = false,
+    Callback = function(state)
+        AutoReviveEnabled = state
+
+        if state then
+            task.spawn(function()
+                while AutoReviveEnabled do
+                    pcall(function()
+                        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+
+                        if char:GetAttribute("Downed") == true then
+                            ReplicatedStorage.Events.Player.ChangePlayerMode:FireServer(true)
+                        end
+
+                        local closestPlayer = nil
+                        local shortestDistance = math.huge
+                        local myRoot = char:FindFirstChild("HumanoidRootPart")
+
+                        if myRoot then
+                            for _, plr in pairs(Players:GetPlayers()) do
+                                if plr ~= LocalPlayer and plr.Character and plr.Character:GetAttribute("Downed") == true then
+                                    local root = plr.Character:FindFirstChild("HumanoidRootPart")
+                                    if root then
+                                        local dist = (myRoot.Position - root.Position).Magnitude
+                                        if dist < shortestDistance then
+                                            shortestDistance = dist
+                                            closestPlayer = plr
+                                        end
+                                    end
+                                end
+                            end
+                        end
+
+                        if closestPlayer then
+                            ReplicatedStorage.Events.Character.Interact
+                                :FireServer("Revive", true, closestPlayer.Name)
+                        end
+                    end)
+
+                    task.wait(0.25)
+                end
+            end)
+        end
+    end
+})
+
+Window
+    :Section({ Title = "Scripts", Opened = false })
+    :Tab({ Title = "Executor", Icon = "code" })
+    :Button({
+        Title = "Run PShade Ultimate",
+        Callback = function()
+            loadstring(
+                game:HttpGet("https://raw.githubusercontent.com/randomstring0/pshade-ultimate/refs/heads/main/src/cd.lua")
+            )()
+        end
+    })
+
+local AppearanceTab = Window
+    :Section({ Title = "Appearance", Opened = false })
+    :Tab({ Title = "Appearance System", Icon = "bird" })
+
+local Themes = {}
+for themeName in pairs(WindUI:GetThemes()) do
+    table.insert(Themes, themeName)
+end
+table.sort(Themes)
+
+local SyncTheme = true
+local SyncDropdown = true
+
+AppearanceTab:Section({
+    Title = "Customize Interface",
+    TextSize = 20
+})
+
+local ThemeDropdown = AppearanceTab:Dropdown({
+    Title = "Theme Select",
+    Values = Themes,
+    SearchBarEnabled = true,
+    MenuWidth = 280,
+    Value = "Dark",
+    Callback = function(theme)
+        SyncDropdown = false
+        WindUI:SetTheme(theme)
+
+        WindUI:Notify({
+            Title = "Theme Applied",
+            Content = theme,
+            Icon = "palette",
+            Duration = 2
+        })
+
+        SyncDropdown = true
+    end
+})
+
+AppearanceTab:Slider({
+    Title = "Transparency",
+    Value = { Min = 0, Max = 1, Default = 0.2 },
+    Step = 0.1,
+    Callback = function(value)
+        WindUI.TransparencyValue = tonumber(value)
+        Window:ToggleTransparency(value > 0)
+    end
+})
+
+local DarkModeToggle
+DarkModeToggle = AppearanceTab:Toggle({
+    Title = "Enable Dark Mode",
+    Desc = "Use dark color scheme",
+    Value = true,
+    Callback = function(enabled)
+        if SyncTheme then
+            WindUI:SetTheme(enabled and "Dark" or "Light")
+        end
+        if SyncDropdown then
+            ThemeDropdown:Select(enabled and "Dark" or "Light")
+        end
+    end
+})
+
+WindUI:OnThemeChange(function(theme)
+    SyncTheme = false
+    DarkModeToggle:Set(theme == "Dark")
+    SyncTheme = true
+end)
+
+local HelpTab = Window
+    :Section({ Title = "Help", Opened = false })
+    :Tab({ Title = "Discord Community", Icon = "settings" })
+
+Window:Section({
+    Title = "Shnmaxhub " .. WindUI.Version
+})
+
+HelpTab:Button({
+    Title = "Copy Discord Invite",
+    Callback = function()
+        setclipboard("https://discord.gg/ytFt4AzFfv")
+        WindUI:Notify({
+            Title = "Copied!",
+            Content = "Discord invite copied to clipboard",
+            Duration = 2
+        })
+    end
+})
+
+Window:Tag({
+    Title = "Beta",
+    Color = Color3.fromHex("#315dff")
+})
